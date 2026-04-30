@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opkas</title>
+  <meta name="theme-color" content="#001845" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="api-modal" class="backdrop" hidden>
+    <div class="dialog" role="dialog" aria-labelledby="modal-title">
+      <h2 id="modal-title">Verstekinstellings</h2>
+      <p>
+        Set your Blink <strong>read-only</strong> API key. Create one on the
+        <a href="https://dashboard.blink.sv/" target="_blank" rel="noopener">Blink dashboard</a>,
+        sign in, then use <strong>API Keys</strong> in the left menu and create a key with only <strong>Read</strong> access.
+      </p>
+      <label for="api-key-input">API key</label>
+      <input id="api-key-input" type="password" autocomplete="off" placeholder="Leave blank to keep existing" />
+      <label for="comment-server-input">Comment server (optional)</label>
+      <input id="comment-server-input" type="text" autocomplete="off" placeholder="e.g. https://comment.example.com" />
+      <div id="modal-err" class="err" hidden></div>
+      <div class="actions">
+        <button type="button" class="secondary" id="modal-cancel">Cancel</button>
+        <button type="button" id="modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <h1>Transaksies</h1>
+    <div class="header-actions">
+      <button type="button" class="ghost" id="settings">Verstekinstellings</button>
+    </div>
+  </header>
+  <main id="app">
+    <div class="toolbar">
+      <div>
+        <label for="day">Dag</label>
+        <input id="day" type="date" />
+      </div>
+      <div>
+        <button type="button" id="fetch">Transaksies oproep</button>
+      </div>
+    </div>
+    <p class="range-hint" id="range-hint"></p>
+    <div class="summary" id="summary" hidden></div>
+    <div id="warnings" hidden></div>
+    <div class="err" id="fetch-err" hidden></div>
+    <ul class="tx-list" id="list"></ul>
+    <p class="empty" id="empty">Kies 'n dag en klik op "Transaksies oproep".</p>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
