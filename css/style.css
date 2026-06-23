@@ -88,6 +88,9 @@ ul.tx-list { list-style: none; padding: 0; margin: 0; }
 }
 .pill.btc { background: #ffefd5; }
 .pill.usd { background: #d9f5e7; }
+.pill.in { background: #dbeafe; }
+.pill.out { background: #fee2e2; }
+.tx-pills { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
 .amounts {
   font-size: 0.88rem;
   margin-top: 0.35rem;

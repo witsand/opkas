@@ -299,7 +299,7 @@ function parseOraMemo(memo) {
   return { ora: amt, merk };
 }
 
-function renderTx(tx) {
+function renderTx(tx, opts = {}) {
   const cur = tx.settlementCurrency;
   let satPart = '';
 
@@ -322,11 +322,14 @@ function renderTx(tx) {
 
   const dt = new Date(tx.createdAt * 1000);
   const pillClass = cur === 'BTC' ? 'btc' : 'usd';
+  const directionHtml = opts.showDirection
+    ? `<span class="pill ${tx.direction === 'SEND' ? 'out' : 'in'}">${escapeHtml(tx.direction === 'SEND' ? 'Uitgaande' : 'Inkomend')}</span>`
+    : '';
 
   return `<li class="tx">
     <div class="tx-head">
       <span>${escapeHtml(dt.toLocaleString())}</span>
-      <span class="pill ${pillClass}">${escapeHtml(cur)}-beursie</span>
+      <span class="tx-pills">${directionHtml}<span class="pill ${pillClass}">${escapeHtml(cur)}-beursie</span></span>
     </div>
     <div class="amounts">
       <span><strong>Vereffen</strong>: ${escapeHtml(satPart)}</span>
@@ -413,11 +416,13 @@ async function runFetch() {
       if (!hasNext || !after || (edges.length && oldestInBatch < fromSec)) break;
     }
 
-    // Only successful incoming.
+    // Only successful incoming for Ora grouping; outgoing shown in warnings.
     const incoming = collected.filter((t) => t && t.status === 'SUCCESS' && t.direction === 'RECEIVE');
+    const outgoing = collected.filter((t) => t && t.status === 'SUCCESS' && t.direction === 'SEND');
 
     // Oldest → newest.
     incoming.sort((a, b) => a.createdAt - b.createdAt);
+    outgoing.sort((a, b) => a.createdAt - b.createdAt);
 
     const commentServer = getCommentServer();
     if (commentServer) {
@@ -451,6 +456,8 @@ async function runFetch() {
       if (!parsed) warnings.push(t);
       else valid.push({ ...t, _ora: parsed.ora, _merk: parsed.merk });
     }
+    for (const t of outgoing) warnings.push(t);
+    warnings.sort((a, b) => a.createdAt - b.createdAt);
 
     const totalsBtcSat = valid
       .filter((t) => t.settlementCurrency === 'BTC')
@@ -458,7 +465,7 @@ async function runFetch() {
     const totalsOra = valid.reduce((s, t) => s + (Number(t._ora) || 0), 0);
 
     $summary.innerHTML =
-      `<div><strong>Opsomming</strong></div>` +
+      `<div><strong>Opsomming van transaksies by verkoopspunte</strong></div>` +
       `<div class="grid">` +
       `<div><div class="metric">Transaksies</div><div class="value">${escapeHtml(String(valid.length))}</div></div>` +
       `<div><div class="metric">Totale sats</div><div class="value">${escapeHtml(fmtNum(totalsBtcSat))}</div></div>` +
@@ -493,29 +500,46 @@ async function runFetch() {
       .join('');
 
     if (warnings.length) {
-      const warnSats = warnings
-        .filter((t) => t.settlementCurrency === 'BTC')
+      const warnInSats = warnings
+        .filter((t) => t.direction === 'RECEIVE' && t.settlementCurrency === 'BTC')
         .reduce((s, t) => s + (Number(t.settlementAmount) || 0), 0);
+      const warnOutSats = warnings
+        .filter((t) => t.direction === 'SEND' && t.settlementCurrency === 'BTC')
+        .reduce((s, t) => s + (Number(t.settlementAmount) || 0), 0);
+      const warnInUsd = warnings
+        .filter((t) => t.direction === 'RECEIVE' && t.settlementCurrency === 'USD')
+        .reduce((s, t) => s + (Number(t.settlementAmount) || 0), 0);
+      const warnOutUsd = warnings
+        .filter((t) => t.direction === 'SEND' && t.settlementCurrency === 'USD')
+        .reduce((s, t) => s + (Number(t.settlementAmount) || 0), 0);
+
+      let warnMeta =
+        `in: ${escapeHtml(fmtNum(warnInSats))} sat · uit: ${escapeHtml(fmtNum(warnOutSats))} sat`;
+      if (warnInUsd || warnOutUsd) {
+        warnMeta +=
+          ` · in: ${escapeHtml(fmtUsd(warnInUsd))} · uit: ${escapeHtml(fmtUsd(warnOutUsd))}`;
+      }
 
       $warnings.innerHTML =
         `<details class="group warning">` +
         `<summary>` +
         `<span><strong>Waarskuwings (nie getel nie)</strong> <span class="meta">(${escapeHtml(String(warnings.length))} tx)</span></span>` +
-        `<span class="meta">${escapeHtml(fmtNum(warnSats))} sat</span>` +
+        `<span class="meta">${warnMeta}</span>` +
         `</summary>` +
-        `<div class="muted">Memo moet lyk soos <strong>Φ{bedrag} #{merk}</strong>.</div>` +
-        `<ul class="tx-list">${warnings.map(renderTx).join('')}</ul>` +
+        `<div class="muted">Ongeldige memo's en uitgaande transaksies word nie by die opsomming getel nie. Memo moet lyk soos <strong>Φ{bedrag} #{merk}</strong>.</div>` +
+        `<ul class="tx-list">${warnings.map((t) => renderTx(t, { showDirection: true })).join('')}</ul>` +
         `</details>`;
       $warnings.hidden = false;
     }
 
+    const hasContent = valid.length > 0 || warnings.length > 0;
     $empty.textContent =
-      incoming.length === 0
-        ? 'Geen suksesvolle inkomende transaksies in hierdie tydperk nie.'
-        : valid.length === 0
+      collected.filter((t) => t && t.status === 'SUCCESS').length === 0
+        ? 'Geen suksesvolle transaksies in hierdie tydperk nie.'
+        : valid.length === 0 && incoming.length > 0
           ? 'Geen geldige Ora-memo\'s in hierdie tydperk gevind nie.'
           : '';
-    $empty.style.display = (incoming.length && valid.length) ? 'none' : 'block';
+    $empty.style.display = hasContent ? 'none' : 'block';
   } catch (e) {
     $fetchErr.textContent = e.message || String(e);
     $fetchErr.hidden = false;
@@ -554,6 +578,6 @@ if (!getApiKey()) {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=2', { scope: './' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=3', { scope: './' }).catch(() => {});
   });
 }
