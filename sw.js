@@ -1,13 +1,14 @@
 /* eslint-disable no-restricted-globals */
 'use strict';
 
-const CACHE_NAME = 'opkas-v1';
+const CACHE_NAME = 'opkas-v2';
+const ASSET_VERSION = '2';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './css/style.css',
-  './js/app.js',
-  './manifest.webmanifest',
+  `./css/style.css?v=${ASSET_VERSION}`,
+  `./js/app.js?v=${ASSET_VERSION}`,
+  `./manifest.webmanifest?v=${ASSET_VERSION}`,
   './static/icon.svg',
   './static/og-image.svg'
 ];
