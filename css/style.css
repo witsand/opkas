@@ -63,7 +63,6 @@ button.secondary {
   color: var(--fg);
   border-color: var(--line);
 }
-.range-hint { font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem; }
 .err { color: #b91c1c; font-size: 0.9rem; margin: 0.5rem 0; }
 ul.tx-list { list-style: none; padding: 0; margin: 0; }
 .tx {

@@ -13,7 +13,6 @@ const $dayLabel = document.getElementById('day-label');
 const $multiDay = document.getElementById('multi-day');
 const $fetch = document.getElementById('fetch');
 const $settings = document.getElementById('settings');
-const $rangeHint = document.getElementById('range-hint');
 const $summary = document.getElementById('summary');
 const $warnings = document.getElementById('warnings');
 const $fetchErr = document.getElementById('fetch-err');
@@ -272,25 +271,10 @@ async function validateAndSaveKey() {
     }
     setCommentServer(commentServer);
     hideModal(true);
-    updateRangeHint();
   } catch (e) {
     $modalErr.textContent = e.message || String(e);
     $modalErr.hidden = false;
   }
-}
-
-function updateRangeHint() {
-  const { fromSec, toSec, start, end } = currentUnixRange();
-  const opts = {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  };
-  $rangeHint.textContent =
-    `Sluit transaksies in van ${start.toLocaleString(undefined, opts)} tot ${end.toLocaleString(undefined, opts)} (plaaslik). ` +
-    `Unix: ${fromSec} – ${toSec}.`;
 }
 
 function fmtNum(n) {
@@ -550,18 +534,14 @@ $day.value = localDateInputValue();
 $dayTo.value = localDateInputValue();
 $day.addEventListener('change', () => {
   if ($dayTo.value < $day.value) $dayTo.value = $day.value;
-  updateRangeHint();
 });
-$dayTo.addEventListener('change', updateRangeHint);
 $multiDay.addEventListener('change', () => {
   $dayToWrap.hidden = !$multiDay.checked;
   $dayLabel.textContent = $multiDay.checked ? 'Van' : 'Dag';
   if ($multiDay.checked && (!$dayTo.value || $dayTo.value < $day.value)) {
     $dayTo.value = $day.value;
   }
-  updateRangeHint();
 });
-updateRangeHint();
 
 $fetch.onclick = () => runFetch();
 
