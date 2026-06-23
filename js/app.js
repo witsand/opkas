@@ -7,6 +7,10 @@ const $keyInput = document.getElementById('api-key-input');
 const $commentServerInput = document.getElementById('comment-server-input');
 const $modalErr = document.getElementById('modal-err');
 const $day = document.getElementById('day');
+const $dayTo = document.getElementById('day-to');
+const $dayToWrap = document.getElementById('day-to-wrap');
+const $dayLabel = document.getElementById('day-label');
+const $multiDay = document.getElementById('multi-day');
 const $fetch = document.getElementById('fetch');
 const $settings = document.getElementById('settings');
 const $rangeHint = document.getElementById('range-hint');
@@ -42,6 +46,36 @@ function dayUnixRange(dateStr) {
   const fromSec = Math.floor(start.getTime() / 1000);
   const toSec = Math.floor(end.getTime() / 1000);
   return { fromSec, toSec, start, end };
+}
+
+/** Inclusive local-day range [start of fromStr … min(now, end of toStr)] in Unix seconds */
+function rangeUnix(fromStr, toStr) {
+  let [fy, fm, fd] = fromStr.split('-').map(Number);
+  let [ty, tm, td] = toStr.split('-').map(Number);
+  let start = new Date(fy, fm - 1, fd, 0, 0, 0, 0);
+  let endOfDay = new Date(ty, tm - 1, td, 23, 59, 59, 999);
+  // Swap if the user picked a "to" that is before "from".
+  if (endOfDay.getTime() < start.getTime()) {
+    start = new Date(ty, tm - 1, td, 0, 0, 0, 0);
+    endOfDay = new Date(fy, fm - 1, fd, 23, 59, 59, 999);
+  }
+  const now = new Date();
+  if (start.getTime() > now.getTime()) {
+    const unreachable = Math.floor(now.getTime() / 1000) + 2;
+    return { fromSec: unreachable, toSec: unreachable - 3, start, end: start };
+  }
+  const end = endOfDay.getTime() <= now.getTime() ? endOfDay : now;
+  const fromSec = Math.floor(start.getTime() / 1000);
+  const toSec = Math.floor(end.getTime() / 1000);
+  return { fromSec, toSec, start, end };
+}
+
+/** Returns the active Unix range based on the multi-day toggle. */
+function currentUnixRange() {
+  if ($multiDay && $multiDay.checked) {
+    return rangeUnix($day.value, $dayTo.value || $day.value);
+  }
+  return dayUnixRange($day.value);
 }
 
 let inMemoryApiKey = '';
@@ -185,13 +219,13 @@ function formatIx(iv) {
   if (!iv) return [];
   switch (iv.__typename) {
     case 'InitiationViaIntraLedger':
-      return [['Counterparty', iv.counterPartyUsername]].filter(([_, v]) => v);
+      return [['Teenparty', iv.counterPartyUsername]].filter(([_, v]) => v);
     case 'InitiationViaLn':
       return [
         ['LN payment hash', iv.paymentHash],
       ].filter(([_, v]) => v);
     case 'InitiationViaOnChain':
-      return [['On-chain address', iv.address]].filter(([_, v]) => v);
+      return [['Op-ketting-adres', iv.address]].filter(([_, v]) => v);
     default:
       return [];
   }
@@ -201,7 +235,7 @@ function formatSv(sv) {
   if (!sv) return [];
   switch (sv.__typename) {
     case 'SettlementViaOnChain':
-      return [['Tx hash', sv.transactionHash], ['vout', sv.vout != null ? String(sv.vout) : '']].filter(([_, v]) => v);
+      return [['Tx-haas', sv.transactionHash], ['vout', sv.vout != null ? String(sv.vout) : '']].filter(([_, v]) => v);
     default:
       return [];
   }
@@ -226,7 +260,7 @@ async function validateAndSaveKey() {
   const commentServer = normalizeCommentServerUrl($commentServerInput.value);
 
   if (window._modalMandatory && !maybeKey && !getApiKey()) {
-    $modalErr.textContent = 'Enter your API key.';
+    $modalErr.textContent = 'Voer jou API-sleutel in.';
     $modalErr.hidden = false;
     return;
   }
@@ -246,7 +280,7 @@ async function validateAndSaveKey() {
 }
 
 function updateRangeHint() {
-  const { fromSec, toSec, start, end } = dayUnixRange($day.value);
+  const { fromSec, toSec, start, end } = currentUnixRange();
   const opts = {
     weekday: 'short',
     month: 'short',
@@ -255,7 +289,7 @@ function updateRangeHint() {
     minute: '2-digit',
   };
   $rangeHint.textContent =
-    `Including transactions from ${start.toLocaleString(undefined, opts)} to ${end.toLocaleString(undefined, opts)} (local). ` +
+    `Sluit transaksies in van ${start.toLocaleString(undefined, opts)} tot ${end.toLocaleString(undefined, opts)} (plaaslik). ` +
     `Unix: ${fromSec} – ${toSec}.`;
 }
 
@@ -308,10 +342,10 @@ function renderTx(tx) {
   return `<li class="tx">
     <div class="tx-head">
       <span>${escapeHtml(dt.toLocaleString())}</span>
-      <span class="pill ${pillClass}">${escapeHtml(cur)} wallet</span>
+      <span class="pill ${pillClass}">${escapeHtml(cur)}-beursie</span>
     </div>
     <div class="amounts">
-      <span><strong>Settled</strong>: ${escapeHtml(satPart)}</span>
+      <span><strong>Vereffen</strong>: ${escapeHtml(satPart)}</span>
     </div>
     ${notesHtml ? `<div class="notes">${notesHtml}</div>` : ''}
   </li>`;
@@ -365,7 +399,7 @@ async function runFetch() {
   $warnings.innerHTML = '';
 
   try {
-    const { fromSec, toSec } = dayUnixRange($day.value);
+    const { fromSec, toSec } = currentUnixRange();
     let after = null;
     const collected = [];
     const BATCH = 50;
@@ -440,11 +474,11 @@ async function runFetch() {
     const totalsOra = valid.reduce((s, t) => s + (Number(t._ora) || 0), 0);
 
     $summary.innerHTML =
-      `<div><strong>Summary</strong></div>` +
+      `<div><strong>Opsomming</strong></div>` +
       `<div class="grid">` +
-      `<div><div class="metric">Transactions</div><div class="value">${escapeHtml(String(valid.length))}</div></div>` +
-      `<div><div class="metric">Total sats</div><div class="value">${escapeHtml(fmtNum(totalsBtcSat))}</div></div>` +
-      `<div><div class="metric">Total Ora</div><div class="value">${escapeHtml(String(totalsOra))}</div></div>` +
+      `<div><div class="metric">Transaksies</div><div class="value">${escapeHtml(String(valid.length))}</div></div>` +
+      `<div><div class="metric">Totale sats</div><div class="value">${escapeHtml(fmtNum(totalsBtcSat))}</div></div>` +
+      `<div><div class="metric">Totale Ora</div><div class="value">${escapeHtml(String(totalsOra))}</div></div>` +
       `</div>`;
     $summary.hidden = false;
 
@@ -475,33 +509,27 @@ async function runFetch() {
       .join('');
 
     if (warnings.length) {
+      const warnSats = warnings
+        .filter((t) => t.settlementCurrency === 'BTC')
+        .reduce((s, t) => s + (Number(t.settlementAmount) || 0), 0);
+
       $warnings.innerHTML =
-        `<div class="warning-wrap">` +
-        `<div class="warning-title">Warnings (not counted)</div>` +
-        `<div class="muted">Memo must look like <strong>Φ{amount} #{merk}</strong>.</div>` +
-        `<ul>` +
-        warnings
-          .map((t) => {
-            const dt = new Date(t.createdAt * 1000);
-            const memo = t.memo == null ? '' : String(t.memo);
-            const ph = t?.initiationVia?.__typename === 'InitiationViaLn' ? t?.initiationVia?.paymentHash : '';
-            const parts = [
-              `${dt.toLocaleString()} · ${t.settlementCurrency === 'BTC' ? `${fmtNum(t.settlementAmount)} sat` : `${fmtUsd(t.settlementAmount)} USD`}`,
-              memo ? `memo: ${memo}` : 'memo: (empty)',
-              ph ? `paymentHash: ${ph}` : '',
-            ].filter(Boolean);
-            return `<li>${escapeHtml(parts.join(' · '))}</li>`;
-          })
-          .join('') +
-        `</ul></div>`;
+        `<details class="group warning">` +
+        `<summary>` +
+        `<span><strong>Waarskuwings (nie getel nie)</strong> <span class="meta">(${escapeHtml(String(warnings.length))} tx)</span></span>` +
+        `<span class="meta">${escapeHtml(fmtNum(warnSats))} sat</span>` +
+        `</summary>` +
+        `<div class="muted">Memo moet lyk soos <strong>Φ{bedrag} #{merk}</strong>.</div>` +
+        `<ul class="tx-list">${warnings.map(renderTx).join('')}</ul>` +
+        `</details>`;
       $warnings.hidden = false;
     }
 
     $empty.textContent =
       incoming.length === 0
-        ? 'No incoming successful transactions in this time range.'
+        ? 'Geen suksesvolle inkomende transaksies in hierdie tydperk nie.'
         : valid.length === 0
-          ? 'No valid Ora memos found in this time range.'
+          ? 'Geen geldige Ora-memo\'s in hierdie tydperk gevind nie.'
           : '';
     $empty.style.display = (incoming.length && valid.length) ? 'none' : 'block';
   } catch (e) {
@@ -519,7 +547,20 @@ document.getElementById('modal-cancel').onclick = hideModal;
 $settings.onclick = () => showModal(false);
 
 $day.value = localDateInputValue();
-$day.addEventListener('change', updateRangeHint);
+$dayTo.value = localDateInputValue();
+$day.addEventListener('change', () => {
+  if ($dayTo.value < $day.value) $dayTo.value = $day.value;
+  updateRangeHint();
+});
+$dayTo.addEventListener('change', updateRangeHint);
+$multiDay.addEventListener('change', () => {
+  $dayToWrap.hidden = !$multiDay.checked;
+  $dayLabel.textContent = $multiDay.checked ? 'Van' : 'Dag';
+  if ($multiDay.checked && (!$dayTo.value || $dayTo.value < $day.value)) {
+    $dayTo.value = $day.value;
+  }
+  updateRangeHint();
+});
 updateRangeHint();
 
 $fetch.onclick = () => runFetch();
