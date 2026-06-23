@@ -532,6 +532,9 @@ $settings.onclick = () => showModal(false);
 
 $day.value = localDateInputValue();
 $dayTo.value = localDateInputValue();
+$multiDay.checked = false;
+$dayToWrap.hidden = true;
+$dayLabel.textContent = 'Dag';
 $day.addEventListener('change', () => {
   if ($dayTo.value < $day.value) $dayTo.value = $day.value;
 });
