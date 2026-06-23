@@ -1,10 +1,12 @@
 const STORAGE_KEY = 'blink_ro_api_key';
 const COMMENT_SERVER_KEY = 'comment_server_url';
+const SHOW_BALANCE_KEY = 'show_total_balance';
 const ENDPOINT = 'https://api.blink.sv/graphql';
 
 const $modal = document.getElementById('api-modal');
 const $keyInput = document.getElementById('api-key-input');
 const $commentServerInput = document.getElementById('comment-server-input');
+const $showBalance = document.getElementById('show-balance');
 const $modalErr = document.getElementById('modal-err');
 const $day = document.getElementById('day');
 const $dayTo = document.getElementById('day-to');
@@ -13,6 +15,8 @@ const $dayLabel = document.getElementById('day-label');
 const $multiDay = document.getElementById('multi-day');
 const $fetch = document.getElementById('fetch');
 const $settings = document.getElementById('settings');
+const $headerBalance = document.getElementById('header-balance');
+const $headerBalanceValue = document.getElementById('header-balance-value');
 const $summary = document.getElementById('summary');
 const $warnings = document.getElementById('warnings');
 const $fetchErr = document.getElementById('fetch-err');
@@ -91,6 +95,13 @@ try {
   inMemoryCommentServer = '';
 }
 
+let inMemoryShowBalance = false;
+try {
+  inMemoryShowBalance = localStorage.getItem(SHOW_BALANCE_KEY) === 'true';
+} catch {
+  inMemoryShowBalance = false;
+}
+
 function getApiKey() {
   if (inMemoryApiKey) return inMemoryApiKey;
   try {
@@ -133,6 +144,24 @@ function setCommentServer(v) {
   }
 }
 
+function getShowBalance() {
+  if (inMemoryShowBalance) return true;
+  try {
+    return localStorage.getItem(SHOW_BALANCE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setShowBalance(v) {
+  inMemoryShowBalance = !!v;
+  try {
+    localStorage.setItem(SHOW_BALANCE_KEY, inMemoryShowBalance ? 'true' : 'false');
+  } catch {
+    // Some browser contexts can block storage; keep value in memory for this session.
+  }
+}
+
 async function gql(apiKey, query, variables) {
   const res = await fetch(ENDPOINT, {
     method: 'POST',
@@ -162,6 +191,25 @@ const Q_ME_WALLETS = `
         wallets {
           __typename
           id
+          walletCurrency
+          balance
+        }
+      }
+    }
+  }
+`;
+
+const Q_ME_BALANCE = `
+  query MeBalance($currency: DisplayCurrency!) {
+    realtimePrice(currency: $currency) {
+      btcSatPrice { base offset }
+      usdCentPrice { base offset }
+      denominatorCurrencyDetails { fractionDigits }
+    }
+    me {
+      defaultAccount {
+        displayCurrency
+        wallets {
           walletCurrency
           balance
         }
@@ -245,6 +293,7 @@ function showModal(mustDismiss) {
   $modalErr.hidden = true;
   $keyInput.value = '';
   $commentServerInput.value = getCommentServer() || '';
+  if ($showBalance) $showBalance.checked = getShowBalance();
   $keyInput.focus();
   window._modalMandatory = !!mustDismiss;
 }
@@ -270,7 +319,10 @@ async function validateAndSaveKey() {
       setApiKey(maybeKey);
     }
     setCommentServer(commentServer);
+    setShowBalance($showBalance && $showBalance.checked);
     hideModal(true);
+    updateHeaderBalanceVisibility();
+    if (getShowBalance()) await refreshHeaderBalance();
   } catch (e) {
     $modalErr.textContent = e.message || String(e);
     $modalErr.hidden = false;
@@ -286,6 +338,59 @@ function fmtUsd(centsMaybe) {
   const x = typeof centsMaybe === 'number' ? centsMaybe : parseFloat(String(centsMaybe));
   if (!Number.isFinite(x)) return String(centsMaybe);
   return (x / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+}
+
+function priceFromMinorUnit(price) {
+  if (!price) return 0;
+  const base = Number(price.base);
+  const offset = Number(price.offset);
+  if (!Number.isFinite(base) || !Number.isFinite(offset)) return 0;
+  return base / (10 ** offset);
+}
+
+function computeTotalOra(wallets, realtimePrice) {
+  const btcWallet = (wallets || []).find((w) => w.walletCurrency === 'BTC');
+  const usdWallet = (wallets || []).find((w) => w.walletCurrency === 'USD');
+  const btcSats = Number(btcWallet?.balance) || 0;
+  const usdCents = Number(usdWallet?.balance) || 0;
+  const satPrice = priceFromMinorUnit(realtimePrice?.btcSatPrice);
+  const usdCentPrice = priceFromMinorUnit(realtimePrice?.usdCentPrice);
+  const fractionDigits = Number(realtimePrice?.denominatorCurrencyDetails?.fractionDigits);
+  const digits = Number.isFinite(fractionDigits) ? fractionDigits : 2;
+  const zarMinor = btcSats * satPrice + usdCents * usdCentPrice;
+  return zarMinor / (10 ** digits);
+}
+
+function fmtOra(amount) {
+  if (!Number.isFinite(amount)) return '—';
+  return `${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Ora`;
+}
+
+function updateHeaderBalanceVisibility() {
+  if (!$headerBalance) return;
+  $headerBalance.hidden = !(getShowBalance() && getApiKey());
+}
+
+async function refreshHeaderBalance() {
+  if (!getShowBalance()) {
+    updateHeaderBalanceVisibility();
+    return;
+  }
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    updateHeaderBalanceVisibility();
+    return;
+  }
+  updateHeaderBalanceVisibility();
+  if ($headerBalanceValue) $headerBalanceValue.textContent = '…';
+  try {
+    const data = await gql(apiKey, Q_ME_BALANCE, { currency: 'ZAR' });
+    const wallets = data?.me?.defaultAccount?.wallets || [];
+    const total = computeTotalOra(wallets, data?.realtimePrice);
+    if ($headerBalanceValue) $headerBalanceValue.textContent = fmtOra(total);
+  } catch {
+    if ($headerBalanceValue) $headerBalanceValue.textContent = '—';
+  }
 }
 
 function parseOraMemo(memo) {
@@ -574,10 +679,13 @@ $fetch.onclick = () => runFetch();
 
 if (!getApiKey()) {
   showModal(true);
+} else {
+  updateHeaderBalanceVisibility();
+  if (getShowBalance()) refreshHeaderBalance();
 }
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3', { scope: './' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=4', { scope: './' }).catch(() => {});
   });
 }

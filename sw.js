@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-globals */
 'use strict';
 
-const CACHE_NAME = 'opkas-v3';
-const ASSET_VERSION = '3';
+const CACHE_NAME = 'opkas-v4';
+const ASSET_VERSION = '4';
 const CORE_ASSETS = [
   './',
   './index.html',

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Opkas</title>
   <meta name="theme-color" content="#001845" />
-  <link rel="manifest" href="manifest.webmanifest?v=3" />
-  <link rel="stylesheet" href="css/style.css?v=3" />
+  <link rel="manifest" href="manifest.webmanifest?v=4" />
+  <link rel="stylesheet" href="css/style.css?v=4" />
 </head>
 <body>
   <div id="api-modal" class="backdrop" hidden>
@@ -21,6 +21,9 @@
       <input id="api-key-input" type="password" autocomplete="off" placeholder="Los leeg om bestaande te behou" />
       <label for="comment-server-input">Kommentaarbediener (opsioneel)</label>
       <input id="comment-server-input" type="text" autocomplete="off" placeholder="bv. https://comment.example.com" />
+      <div class="modal-checkbox">
+        <label for="show-balance"><input id="show-balance" type="checkbox" autocomplete="off" /> Wys totale balans (Ora)</label>
+      </div>
       <div id="modal-err" class="err" hidden></div>
       <div class="actions">
         <button type="button" class="secondary" id="modal-cancel">Kanselleer</button>
@@ -31,6 +34,9 @@
 
   <header>
     <h1>Transaksies</h1>
+    <div id="header-balance" class="header-balance" hidden>
+      <span id="header-balance-value">…</span>
+    </div>
     <div class="header-actions">
       <button type="button" class="ghost" id="settings">Instellings</button>
     </div>
@@ -59,6 +65,6 @@
     <p class="empty" id="empty">Kies datums en klik op "Transaksies oproep".</p>
   </main>
 
-  <script src="js/app.js?v=3"></script>
+  <script src="js/app.js?v=4"></script>
 </body>
 </html>
